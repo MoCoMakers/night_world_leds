@@ -14,6 +14,9 @@
   #define ESP_RESET ESP.reset()
 #endif
 
+#include "index_html.h"
+#include "main_js.h"
+
 /* Key libraries:
 - https://github.com/kitesurfer1404/WS2812FX
 - https://github.com/FastLED/FastLED
@@ -29,12 +32,13 @@
 // #define WIFI_PASSWORD "YOURPASSWORD"
 #define WIFI_SSID "Sandwiches"
 #define WIFI_PASSWORD "123456789m"
+#define LAST_IP_OCTET 120 # Values are planned between 120 and 140 with no overlap
 
 
 #define STATIC_IP
 #ifdef STATIC_IP
   // Configure this per device
-  IPAddress ip(192,168,0,123);
+  IPAddress ip(192,168,134,LAST_IP_OCTET);
   IPAddress gateway(192,168,0,1);
   IPAddress subnet(255,255,255,0);
 #endif
@@ -53,9 +57,10 @@ uint8_t myModes[] = {}; // *** optionally create a custom list of effect/mode nu
 bool auto_cycle = false;
 
 WS2812FX ws2812fx = WS2812FX(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+WEB_SERVER server(HTTP_PORT);
 
 void setup() {
-Serial.begin(115200);
+  Serial.begin(115200);
   delay(500);
   Serial.println("\n\nStarting...");
 
