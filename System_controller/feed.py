@@ -2,6 +2,7 @@ import requests
 from PIL import Image
 import cv2
 import numpy as np
+import time
 
 class Feed:
     def __init__(self, ip, face_classifier, eye_classifier, frontal_detector):
@@ -12,8 +13,7 @@ class Feed:
         self.face_classifier = face_classifier
         self.eye_classifier = eye_classifier
         self.frontal_detector = frontal_detector
-
-       
+  
     def set_feed_resolution(self, resolution):
         # FEED_RESOLUTION = (320,240)
         # FEED_RESOLUTION = (640,480)
@@ -22,13 +22,22 @@ class Feed:
         self.feed_resolution = resolution
 
     def load_image(self, doReturn=False):
-        url = f"http://{self.ip}/jpg"
-
         try:
-            response = requests.get(url, stream=True)
-            self.latest_image = Image.open(response.raw)
+            img = Image.open(requests.get("http://"+self.ip+"/jpg", stream=True).raw)
+            img.convert('RGB')
+            # read the image
+            img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            img = cv2.resize(img, self.feed_resolution)
+            self.latest_image = img
+            self.status = "ACTIVE"
         except requests.exceptions.ConnectTimeout:
-            self.status = "DISCONNECTED"
+            self.status = "DISCONNECTED 1"
+        except requests.exceptions.ConnectionError:
+            self.status = "DISCONNECTED 2"
+        except requests.exceptions.ReadTimeout:
+            self.status = "DISCONNECTED 3"
+        except:
+            self.status = "FAILED"
         
 
         if doReturn:
@@ -36,10 +45,6 @@ class Feed:
     
     def detect_faces(self):
         img = self.latest_image
-        # read the image
-        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        img = cv2.resize(img, self.feed_resolution)
-
         # Adjust the brightness and contrast 
         # Adjusts the brightness by adding 10 to each pixel value 
         # brightness = 10 

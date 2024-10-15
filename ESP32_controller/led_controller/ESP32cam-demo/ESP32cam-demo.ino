@@ -61,15 +61,23 @@
 //                          ====================================== 
 
 #define SSID_NAME "Sandwiches"
-
 #define SSID_PASWORD "123456789m"
+#define LAST_IP_OCTET 120 // Values are planned between 120 and 140 with no overlap
+
+/* See also these lines in this file
+   int cameraImageExposure = 1200;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
+   int cameraImageGain = 30;                             // Image gain (0 - 30)
+   int cameraImageBrightness = 2;                       // Image brightness (-2 to +2)
+
+   and:
+   framesize_t FRAME_SIZE_IMAGE = cyclingRes[4]; // { FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA, FRAMESIZE_VGA }
+*/
 
 #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
 const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
 
-#define WIFI_SSID "Sandwiches"
-#define WIFI_PASSWORD "123456789m"
-#define LAST_IP_OCTET 121 // Values are planned between 120 and 140 with no overlap
+
+
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -183,7 +191,7 @@ const String OTAPassword = "password";       // Password for performing OTA upda
 
 //#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
-framesize_t FRAME_SIZE_IMAGE = cyclingRes[0];
+framesize_t FRAME_SIZE_IMAGE = cyclingRes[4]; // { FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA, FRAMESIZE_VGA }
 #include <WString.h>            // this is required for base64.h otherwise get errors with esp32 core 1.0.6 - jan23
 #include <base64.h>             // for encoding buffer to display image on page
 #include <WiFi.h>
@@ -195,7 +203,7 @@ framesize_t FRAME_SIZE_IMAGE = cyclingRes[0];
   #include "time.h"
   struct tm timeinfo;
   const char* ntpServer = "pool.ntp.org";
-  const char* TZ_INFO    = "GMT+0BST-1,M3.5.0/01:00:00,M10.5.0/02:00:00";  // enter your time zone (https://remotemonitoringsystems.ca/time-zone-abbreviations.php)
+  const char* TZ_INFO    = "EST5EDT";  // enter your time zone (https://remotemonitoringsystems.ca/time-zone-abbreviations.php)
   long unsigned lastNTPtime;
   time_t now;
    
@@ -306,13 +314,16 @@ void setup() {
 
  // NTP - internet time
    if (serialDebug) Serial.println("\nGetting real time (NTP)");
-   configTime(0, 0, ntpServer);
+   //configTime(0, 0, ntpServer);
    setenv("TZ", TZ_INFO, 1);
+   /*
    if (getNTPtime(10)) {  // wait up to 10 sec to sync
    } else {
      if (serialDebug) Serial.println("Time not set");
-   }
+   } 
+   */
    lastNTPtime = time(&now);
+
 
  // set up camera
      if (serialDebug) Serial.print(("\nInitialising camera: "));
@@ -525,7 +536,7 @@ if (reset) {
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, PSRAM must be enabled
    if (!psramFound()) {
      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
-     config.frame_size = FRAMESIZE_SVGA;
+     config.frame_size = FRAMESIZE_VGA;
      config.fb_location = CAMERA_FB_IN_DRAM;
    }
 

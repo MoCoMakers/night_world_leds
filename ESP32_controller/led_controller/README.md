@@ -3,5 +3,10 @@ Upload each ESP32 - but modify the led_controller.ino with an new IP address per
 Upload sketch. Some of the boards are using: AI Thinker ESP32-CAM (Install both Espressif ESP32 boards and Arduino ESP32 boards in the IDE)
 
 Visit the IP address in the browser: http://192.168.134.LAST_OCTET
-- Change resolution to 
+
+For each ESP32 Camera:
+- Update the last octed
 - Change Brigtness: 2, Exposure: 1200, Gain: 30
+
+Troubleshooting:
+- Make sure your System laptop is on the same local network as the ESP32 devices
