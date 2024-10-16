@@ -36,7 +36,7 @@ class Feed:
             self.status = "DISCONNECTED 2"
         except requests.exceptions.ReadTimeout:
             self.status = "DISCONNECTED 3"
-        except:
+        except:  # noqa: E722
             self.status = "FAILED"
         
 

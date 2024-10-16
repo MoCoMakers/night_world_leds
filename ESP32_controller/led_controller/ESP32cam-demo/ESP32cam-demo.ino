@@ -1,47 +1,3 @@
-/*******************************************************************************************************************
-*
-*                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
-*                                    Github: https://github.com/alanesq/ESP32Cam-demo
-*
-*                                Tested with ESP32 board manager version  3.0.2
-*
-*                                        NOTE: FLASH NOT WORKING - 30Sep24
-*
-*     Starting point sketch for projects using the esp32cam development board with the following features
-*        web server with live video streaming and RGB data from camera demonstrated.
-*        sd card support using 1-bit mode (data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
-*        flash led is still available for use (pin 4) and does not flash when accessing sd card
-*        Stores image in Spiffs if no sd card present
-*        PWM control of the illumination/flash LED
-* 
-*     If ota.h file is in the sketch folder you can enable OTA updating of this sketch by setting '#define ENABLE_OTA 1'
-*        in settings section.  You can then update the sketch with a BIN file via OTA by accessing page   http://x.x.x.x/ota
-*        This can make updating the sketch more convenient, especially if you have installed the camera in a case etc.
-*
-*     GPIO:
-*        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
-*        You could also use pins 1 & 3 if you do not use Serial (disable serialDebug in the settings below)
-*        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
-*        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
-*
-*     You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
-*        the i2c pins to 12 and 13 on the esp32cam module.  Note: this requires the adafruit MCP23017 library to be installed.
-*
-*     Created using the Arduino IDE with ESP32 module installed, no additional libraries required
-*        ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-*
-*     Info on the esp32cam board:  https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/
-*                                  https://github.com/espressif/esp32-camera
-*
-*     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
-*        which includes email support, FTP, OTA updates and motion detection
-*
-*     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
-*        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-*
-*                                                                                 https://alanesq.github.io/
-*
-*******************************************************************************************************************/
 
 #if !defined ESP32
  #error This sketch is only for an ESP32 Camera module
@@ -51,6 +7,9 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
+// Use this verions - https://github.com/teknynja/Adafruit_NeoPixel/tree/esp32_rmt_memory_allocation_fix_safe
+// See: https://forum.arduino.cc/t/neopixel-crash-with-75-pixels-using-esp32-core-3-0-x/1273500/12
+#include <Adafruit_NeoPixel.h>
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -59,10 +18,15 @@
 //                          ====================================== 
 //                                   Enter your wifi settings
 //                          ====================================== 
-
+// ESP32 WiFi Configuration
 #define SSID_NAME "Sandwiches"
 #define SSID_PASWORD "123456789m"
 #define LAST_IP_OCTET 120 // Values are planned between 120 and 140 with no overlap
+
+//LED Strip Configuration
+#define PIN 12
+#define N_LEDS 300 // 75 -80
+#define MAX_BRIGHTNESS 127 // Choose a value between 2 and 255
 
 /* See also these lines in this file
    int cameraImageExposure = 1200;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
@@ -160,7 +124,7 @@ const String OTAPassword = "password";       // Password for performing OTA upda
    const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
 
  const int iopinA = 13;                                 // general io pin 13
- const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
+ const int iopinB = 15;                                 // general io pin 12 (must not be high at boot)
 
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
@@ -246,6 +210,9 @@ WebServer server(80);                          // serve web pages on port 80
       #include "ota.h"                         // Over The Air updates (OTA)
   #endif
 
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(N_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+
+
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
 // ---------------------------------------------------------------
@@ -261,6 +228,8 @@ void setup() {
    Serial.printf("Starting - %s - %s \n", stitle, sversion);
    Serial.println("-----------------------------------");
    // Serial.print("Reset reason: " + ESP.getResetReason());
+
+  strip.begin();
  }
 
  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
@@ -308,6 +277,8 @@ void setup() {
    server.on("/test", handleTest);               // Testing procedure
    server.on("/reboot", handleReboot);           // restart device
    server.onNotFound(handleNotFound);            // invalid url requested
+   server.on("/green", handleLEDGreen); //Set all pixels to green
+   server.on("/white", handleLEDWhite); //Set all pixels to white
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
 #endif  
@@ -394,7 +365,8 @@ void setup() {
    pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
    digitalWrite(indicatorLED,HIGH);          // led off = High
    pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
-   pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
+   pinMode(iopinB, OUTPUT);                  // pin 15 - free io pin, can be used for input or output (must not be high at boot)
+   pinMode(PIN, OUTPUT);                  // pin 12 - LED Output Pin
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
  #if useMCP23017 == 1
@@ -454,18 +426,6 @@ void loop() {
 
  server.handleClient();          // handle any incoming web page requests
 
-
-
-
-
-
- //                           <<< YOUR CODE HERE >>>
-
-
-
-
-
-
 //  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
 //      static uint32_t lastCamera = millis();
 //      if ( ((unsigned long)(millis() - lastCamera) >= 5000) && sdcardPresent ) {
@@ -480,7 +440,6 @@ void loop() {
      esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
      digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
    }
-
 }  // loop
 
 
@@ -649,6 +608,22 @@ void flashLED(int reps) {
  }
 }
 
+void sendBasicHeader(WiFiClient &client, char* hTitle) {
+  // Start page
+      client.write("HTTP/1.1 200 OK\r\n");
+      client.write("Content-Type: text/html\r\n");
+      client.write("Connection: close\r\n");
+      client.write("\r\n");
+      client.write("<!DOCTYPE HTML><html lang='en'>\n");
+    // HTML / CSS
+      client.printf(R"=====(
+        <head>
+          <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+          <title>%s</title>
+        </head>
+        <body>
+        )=====", hTitle);
+}
 
 // ----------------------------------------------------------------
 //      send standard html header (i.e. start of web page)
@@ -1113,7 +1088,7 @@ void handleData(){
     reply += ",";
 
   // line4 - gpio pin status
-    reply += "GPIO output pin 12 is: ";
+    reply += "GPIO output pin 15 is: ";
     reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";
     reply += " &ensp; GPIO input pin 13 is: ";
     reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";
@@ -1633,7 +1608,6 @@ void handleJpeg() {
          </script>
       )=====", refreshRate);        
 
-
   sendFooter(client);     // close web page
 }  // handleJpeg
 
@@ -1869,6 +1843,77 @@ void handleTest() {
 
 }  // handleTest
 
+
+// LED STRIP FUNCTIONS
+
+void writeColor(int r, int g, int b, int brightness, int startLED, int stopLED) {
+  if (brightness > MAX_BRIGHTNESS) {
+    brightness = MAX_BRIGHTNESS;
+  }
+
+  // Apply brightness to RGB values directly
+  r = (r * brightness) >> 8;
+  g = (g * brightness) >> 8;
+  b = (b * brightness) >> 8;
+  for(uint16_t i = startLED; i < stopLED; i++) {
+    strip.setPixelColor(i, strip.Color(r, g, b)); // Draw new pixel
+  }
+  strip.show();
+}
+
+// ----------------------------------------------------------------
+//     -set LEDs to a green    i.e. http://x.x.x.x/green
+// ----------------------------------------------------------------
+
+bool handleLEDGreen() {
+
+  int r = 0;
+  int g = 255;
+  int b = 0;
+  int brightness = 2; // 2 to 255 - 1 is not visible
+  writeColor(r,g,b,brightness, 0, strip.numPixels()-1);
+
+  WiFiClient client = server.client();          // open link with client
+
+  sendBasicHeader(client, "Green LED");
+
+  client.printf(R"=====(
+    <h1>
+      Green LEDs Written
+    </h1>
+    )=====");
+  
+  sendFooter(client);
+  return 1;
+
+}  // handleLEDGreen
+
+// ----------------------------------------------------------------
+//     -set LEDs to a green    i.e. http://x.x.x.x/green
+// ----------------------------------------------------------------
+
+bool handleLEDWhite() {
+
+  int r = 255;
+  int g = 255;
+  int b = 255;
+  int brightness = 255; // 2 to 255 - 1 is not visible
+  writeColor(r,g,b,brightness, 0, strip.numPixels());
+
+  WiFiClient client = server.client();          // open link with client
+
+  sendBasicHeader(client, "White LED");
+
+  client.printf(R"=====(
+    <h1>
+      White LEDs Written
+    </h1>
+    )=====");
+  
+  sendFooter(client);
+  return 1;
+
+}  // handleLEDWhite
 
 // ******************************************************************************************************************
 // end
