@@ -279,6 +279,7 @@ void setup() {
    server.onNotFound(handleNotFound);            // invalid url requested
    server.on("/green", handleLEDGreen); //Set all pixels to green
    server.on("/white", handleLEDWhite); //Set all pixels to white
+   server.on("/colorAll", handleColorChange); //Set all pixels to a given color
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
 #endif  
@@ -1914,6 +1915,42 @@ bool handleLEDWhite() {
   return 1;
 
 }  // handleLEDWhite
+
+
+
+// ----------------------------------------------------------------
+//     -set LEDs to a green    i.e. http://x.x.x.x/colorAll?r=255&g=255&b=255&brightness=127
+// ----------------------------------------------------------------
+
+bool handleColorChange(){
+  // Parse the input values from the client
+  WiFiClient client = server.client();
+  if (!client) return 0;
+
+  Serial.println("receiving from remote server");
+  Serial.println(server.arg("r"));
+  Serial.println(server.arg("g"));
+  Serial.println(server.arg("b"));
+  Serial.println(server.arg("brightness"));
+
+
+  int r = server.arg("r").toInt();
+  int g = server.arg("g").toInt();
+  int b = server.arg("b").toInt();
+  int brightness = server.arg("brightness").toInt();
+  Serial.println(r);
+  Serial.println(g);
+  Serial.println(b);
+  Serial.println(brightness);
+
+  writeColor(r, g, b, brightness, 0, strip.numPixels());
+  
+  sendBasicHeader(client, "LED Control");
+  client.printf(R"=====(<h1>LEDs Color Set</h1><p>R=%d G=%d B=%d Brightness=%d</p>)=====", r, g, b, brightness);
+  sendFooter(client);
+  return 1;
+}  // handleColorChange
+
 
 // ******************************************************************************************************************
 // end
