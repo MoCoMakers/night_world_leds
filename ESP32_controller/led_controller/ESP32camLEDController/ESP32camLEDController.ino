@@ -23,9 +23,14 @@
 #define SSID_PASWORD "123456789m"
 #define LAST_IP_OCTET 120 // Values are planned between 120 and 140 with no overlap
 
+// e.g. 192.168.147.120 is the start of the range
+#define IP_PREFIX_1 192
+#define IP_PREFIX_2 168
+#define IP_PREFIX_3 147
+
 //LED Strip Configuration
 #define PIN 12
-#define N_LEDS 300 // 75 -80
+#define N_LEDS 190
 #define MAX_BRIGHTNESS 127 // Choose a value between 2 and 255
 
 /* See also these lines in this file
@@ -48,8 +53,8 @@ const String OTAPassword = "password";       // Password for performing OTA upda
 #define STATIC_IP
 #ifdef STATIC_IP
   // Configure this per device
-  IPAddress ip(192,168,134,LAST_IP_OCTET);
-  IPAddress gateway(192,168,0,1);
+  IPAddress ip(IP_PREFIX_1,IP_PREFIX_2,IP_PREFIX_3,LAST_IP_OCTET);
+  IPAddress gateway(IP_PREFIX_1,IP_PREFIX_2,0,1);
   IPAddress subnet(255,255,255,0);
 #endif
 
@@ -280,6 +285,7 @@ void setup() {
    server.on("/green", handleLEDGreen); //Set all pixels to green
    server.on("/white", handleLEDWhite); //Set all pixels to white
    server.on("/colorAll", handleColorChange); //Set all pixels to a given color
+   server.on("/colorRange", handleRangeColorChange); //Set all pixels to a given color
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
 #endif  
@@ -1862,6 +1868,18 @@ void writeColor(int r, int g, int b, int brightness, int startLED, int stopLED) 
   strip.show();
 }
 
+void writePixelNoShow(int n, int r, int g, int b, int brightness) {
+  brightness = (brightness > MAX_BRIGHTNESS) ? MAX_BRIGHTNESS : brightness;
+
+  // Apply brightness to RGB values directly using a more efficient bit shift
+  r = (r * brightness) >> 8;
+  g = (g * brightness) >> 8;
+  b = (b * brightness) >> 8;
+
+  strip.setPixelColor(n, strip.Color(r, g, b)); // Draw new pixel
+}
+
+
 // ----------------------------------------------------------------
 //     -set LEDs to a green    i.e. http://x.x.x.x/green
 // ----------------------------------------------------------------
@@ -1938,10 +1956,6 @@ bool handleColorChange(){
   int g = server.arg("g").toInt();
   int b = server.arg("b").toInt();
   int brightness = server.arg("brightness").toInt();
-  Serial.println(r);
-  Serial.println(g);
-  Serial.println(b);
-  Serial.println(brightness);
 
   writeColor(r, g, b, brightness, 0, strip.numPixels());
   
@@ -1950,6 +1964,49 @@ bool handleColorChange(){
   sendFooter(client);
   return 1;
 }  // handleColorChange
+
+
+// ----------------------------------------------------------------
+//     -set LEDs to a given color, in a given range of LED indicies    i.e. http://x.x.x.x/colorRange?i1r=255&i1g=255&i1b=255&i1brightness=127&i2r=255&i2g=255&i2b=255&i2brightness=127
+//      Each i-th index in the URL is an LED index with an r,g,b, and brightness value required
+// ----------------------------------------------------------------
+
+bool handleRangeColorChange() {
+    // Parse the input values from the client
+    WiFiClient client = server.client();
+    if (!client) return 0;
+
+    int declaredPixels = 0;
+    String arg_prefix, r_str, g_str, b_str, brightness_str;
+    int r, g, b, brightness;
+
+    for (int i = 0; i < N_LEDS; i++) {
+        arg_prefix = "i" + String(i);
+        
+        r_str = server.arg(arg_prefix + "r");
+        g_str = server.arg(arg_prefix + "g");
+        b_str = server.arg(arg_prefix + "b");
+        brightness_str = server.arg(arg_prefix + "brightness");
+        
+        if (!r_str.isEmpty() && !g_str.isEmpty() && !b_str.isEmpty() && !brightness_str.isEmpty()) {
+            r = r_str.toInt();
+            g = g_str.toInt();
+            b = b_str.toInt();
+            brightness = brightness_str.toInt();
+            writePixelNoShow(i, r, g, b, brightness);
+            declaredPixels++;
+        }
+    }
+    
+    strip.show();
+
+    sendBasicHeader(client, "Range Color Change");
+    client.printf(R"=====(<h1>Range Color Set</h1><p>Updated LED colors successfully.</p><p>Number of LEDs Updated: %d</p>)=====", declaredPixels);
+    sendFooter(client);
+
+    return 1;
+}
+
 
 
 // ******************************************************************************************************************

@@ -2,46 +2,40 @@ import cv2
 import dlib
 from feed import Feed
 import multiprocessing
+import requests
+from ledGrid import LEDGrid
+import socket
+import re
 
-ip_list = [
-    '192.168.134.120',
-    '192.168.134.121',
-    '192.168.134.122',
-    '192.168.134.123',
-    '192.168.134.124',
-    '192.168.134.125',
-    '192.168.134.126',
-    '192.168.134.127',
-    '192.168.134.128',
-    '192.168.134.129',
-    '192.168.134.130',
-    '192.168.134.131',
-    '192.168.134.132',
-    '192.168.134.133',
-    '192.168.134.134',
-    '192.168.134.135',
-    '192.168.134.136',
-    '192.168.134.137',
-    '192.168.134.138',
-    '192.168.134.139',
-    '192.168.134.140',
-    '192.168.134.141',
+ip_prefix = "192.168.147."
+last_octed_list = [
+    '120',
+    '121',
+    '122',
+    '123',
+    '124',
+    '125',
+    '126',
+    '127',
+    '128',
+    '129',
+    '130',
+    '131',
+    '132',
+    '133',
+    '134',
+    '135',
+    '136',
+    '137',
+    '138',
+    '139',
+    '140',
+    '141',
     ]
 
-"""
-from PIL import Image
-import requests
-IP = '192.168.134.121'
-import numpy as np
-while True:
-    img = Image.open(requests.get("http://"+IP+"/jpg", stream=True).raw)
-    img.save("TESTING.jpg")
-    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-    img = cv2.resize(img, (640,480))
-    cv2.imshow('live feed image', img)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-"""
+ip_list = []
+for octet in last_octed_list:
+    ip_list.append(ip_prefix+octet)
 
 nosignal = cv2.imread('no_signal.png')
 
@@ -80,7 +74,44 @@ def update_feed(ip):
             # Needed to update the display
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 pass
+
+def check_valid_ip(prefix):
+    # Get the local IP address
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    print(local_ip)
+    
+    # Define the regex pattern for the IP prefix
+    pattern = f"^{prefix}"
+    
+    # Check if the local IP address starts with the specified prefix
+    if re.match(pattern, local_ip):
+        return True
+    else:
+        return False
+
 if __name__ == "__main__":
+    
+    if not check_valid_ip(ip_prefix):
+        raise Exception("Check your connected WiFi Network for prefix: "+ip_prefix)
+
+    myGrid = LEDGrid(ip=ip_list[0],n_leds=190)
+    spacer = 4
+    myGrid.define_row(21,31, direction="forward")
+    myGrid.define_row(37,47, direction="backward")
+    myGrid.define_row(57,67, direction="forward")
+    myGrid.define_row(73,83, direction="backward")
+    myGrid.define_row(92,102, direction="forward")
+    myGrid.define_row(107,117, direction="backward")
+    myGrid.define_row(125,135, direction="forward")
+    myGrid.define_row(140,150, direction="backward")
+    myGrid.define_row(157,167, direction="forward")
+    myGrid.define_row(174,184, direction="backward")
+
+
+
+    while True:
+       myGrid.do_animation("wave_pattern_matrix", brightness=100)
 
     # Debugging use this instead:
     # update_feed(ip_list[1])

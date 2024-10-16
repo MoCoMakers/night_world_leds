@@ -3,7 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #define PIN 12
-#define N_LEDS 300 // 75 -80
+#define N_LEDS 300
 #define MAX_BRIGHTNESS 127 // Choose a value between 2 and 255
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(N_LEDS, PIN, NEO_GRB + NEO_KHZ800);

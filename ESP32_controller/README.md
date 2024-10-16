@@ -7,7 +7,7 @@ Visit the IP address in the browser: http://192.168.134.LAST_OCTET
 For each ESP32 Camera:
 - Update the last octed
 - Change Brigtness: 2, Exposure: 1200, Gain: 30
-- Select the right core/board. Some ESP32 Cam devices are using the ESP32 Wrover Module
+- Select the right core/board. Some ESP32 Cam devices are using the "ESP32 Wrover Module"
 
 Troubleshooting:
 - Make sure your System laptop is on the same local network as the ESP32 devices
