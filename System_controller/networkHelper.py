@@ -9,6 +9,7 @@ def do_bulk_esp32_action(function_handle, ip_list):
 def do_simple_get(url, ip):
     try:
         response = requests.get(url)
+        return response
         # time.sleep(time_wait_ms / 1000.0)
     except:
         print("Failed connection on "+ip)

@@ -4,6 +4,7 @@ import dlib
 import socket
 import re
 import time
+import requests
 
 # Get the current working directory
 cwd = os.getcwd()
@@ -19,10 +20,12 @@ from feed import Feed
 from ledGrid import LEDGrid
 from system_context import SystemContext
 from arcadeManager import ArcadeManager
-from networkHelper import do_bulk_esp32_action
+from networkHelper import do_bulk_esp32_action, do_simple_get
 
 from gridContext import global_grid_set, ip_prefix, ip_list
 # See IP Address conguration in gridContext
+
+ARCADE_IP = "192.168.147.93"
 
 def update_feed(ip):
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -82,11 +85,20 @@ def check_valid_ip(prefix):
     else:
         return False
 
+def check_arcade_running(ip):
+    url = "http://"+ip+":5000"
+    response = do_simple_get(url, ip)
+    response: requests.models.Response
+    return response and response.status_code == 200 and "Arcade System Running" in response.text
+
 if __name__ == "__main__":
     nosignal = cv2.imread('no_signal.png')
     
     if not check_valid_ip(ip_prefix):
         raise Exception("Check your connected WiFi Network for prefix: "+ip_prefix)
+    
+    if not check_arcade_running(ARCADE_IP):
+        raise Exception("Make sure arcade is on, and that it's running at address: http://"+ARCADE_IP+":5000")
 
     # Initialize game state variables
     running = True
