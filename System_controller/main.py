@@ -1,43 +1,28 @@
+import os
 import cv2
 import dlib
-from feed import Feed
-import multiprocessing
-import requests
-from ledGrid import LEDGrid
 import socket
 import re
+import time
 
-ip_prefix = "192.168.147."
-last_octed_list = [
-    '120',
-    '121',
-    '122',
-    '123',
-    '124',
-    '125',
-    '126',
-    '127',
-    '128',
-    '129',
-    '130',
-    '131',
-    '132',
-    '133',
-    '134',
-    '135',
-    '136',
-    '137',
-    '138',
-    '139',
-    '140',
-    '141',
-    ]
+# Get the current working directory
+cwd = os.getcwd()
 
-ip_list = []
-for octet in last_octed_list:
-    ip_list.append(ip_prefix+octet)
+try:
+    system_path = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(system_path)
+    print(f"Changed directory to: {system_path}")
+except FileNotFoundError:
+    print("System folder not found")
+    
+from feed import Feed
+from ledGrid import LEDGrid
+from system_context import SystemContext
+from arcadeManager import ArcadeManager
+from networkHelper import do_bulk_esp32_action
 
-nosignal = cv2.imread('no_signal.png')
+from gridContext import global_grid_set, ip_prefix, ip_list
+# See IP Address conguration in gridContext
 
 def update_feed(ip):
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -75,6 +60,13 @@ def update_feed(ip):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 pass
 
+def blackout_single_line(grid):
+    grid: LEDGrid
+    grid.do_full_blackout() 
+
+def blackout_all_lines(global_grid_set):
+    do_bulk_esp32_action(blackout_single_line, global_grid_set)
+
 def check_valid_ip(prefix):
     # Get the local IP address
     hostname = socket.gethostname()
@@ -91,24 +83,44 @@ def check_valid_ip(prefix):
         return False
 
 if __name__ == "__main__":
+    nosignal = cv2.imread('no_signal.png')
     
     if not check_valid_ip(ip_prefix):
         raise Exception("Check your connected WiFi Network for prefix: "+ip_prefix)
 
-    myGrid = LEDGrid(ip=ip_list[0],n_leds=190)
-    spacer = 4
-    myGrid.define_row(21,31, direction="forward")
-    myGrid.define_row(37,47, direction="backward")
-    myGrid.define_row(57,67, direction="forward")
-    myGrid.define_row(73,83, direction="backward")
-    myGrid.define_row(92,102, direction="forward")
-    myGrid.define_row(107,117, direction="backward")
-    myGrid.define_row(125,135, direction="forward")
-    myGrid.define_row(140,150, direction="backward")
-    myGrid.define_row(157,167, direction="forward")
-    myGrid.define_row(174,184, direction="backward")
+    # Initialize game state variables
+    running = True
+    frame_rate = 60  # Frames per second
+    frame_duration = 1.0 / frame_rate  # Duration of each frame in seconds
+
+    # Game loop
+    last_frame_time = time.time()
+
+    starting_rgb = (255,0,0) # Red
+    sysCnt = SystemContext(starting_rgb)
+    arcade = ArcadeManager()
+
+    blackout_all_lines(global_grid_set)
+
+    while running:
+        current_time = time.time()
+        elapsed_time = current_time - last_frame_time
+
+        if elapsed_time >= frame_duration:
+            print("Frame loop")
+            last_frame_time = current_time
+
+            state_requested, request_args = arcade.read_state_requested()
+            if state_requested:
+                sysCnt.update_meta_state(state_requested, request_args, global_grid_set)
+
+            # Update system state
+        else:
+            raise Exception("Undertimed loop actually found!")
+            pass
 
 
+        
 
     while True:
        myGrid.do_animation("wave_pattern_matrix", brightness=100)
@@ -116,7 +128,6 @@ if __name__ == "__main__":
     # Debugging use this instead:
     # update_feed(ip_list[1])
 
-    with multiprocessing.Pool(processes=len(ip_list)) as pool:
-            pool.map(update_feed, ip_list)
+    
         
     cv2.destroyAllWindows()

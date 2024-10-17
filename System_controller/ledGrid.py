@@ -1,6 +1,7 @@
 from ledRow import LEDRow
 import math
 import requests
+from networkHelper import do_simple_get
 
 class LEDGrid:
     def __init__(self, ip, n_leds):
@@ -15,6 +16,12 @@ class LEDGrid:
         self.full_data = pixel_raw
         self.row_strips = []
         self.ip = ip
+        self.theme = None
+        self.status = "inactive"
+
+    def do_full_blackout(self):
+        url = "http://"+self.ip+"/black"
+        do_simple_get(url, self.ip)
 
     def define_row(self, start_index, end_index, direction):
         length = end_index - start_index
@@ -63,3 +70,9 @@ class LEDGrid:
             index = str(key)
             url = url + "&i" + index + "r=" + r + "&i" + index + "g=" + g + "&i" + index + "b=" + b + "&i" + index + "brightness=" + brightness
         return url
+    
+    def set_theme(self, theme):
+        self.theme = theme
+    
+    def set_active(self, status):
+        self.status = status
