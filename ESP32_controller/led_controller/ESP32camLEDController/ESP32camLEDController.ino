@@ -216,6 +216,8 @@ WebServer server(80);                          // serve web pages on port 80
   #endif
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(N_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+// Only used for inital blackout operation
+Adafruit_NeoPixel excess_strip = Adafruit_NeoPixel(300, PIN, NEO_GRB + NEO_KHZ800);
 
 
 // ---------------------------------------------------------------
@@ -235,6 +237,7 @@ void setup() {
    // Serial.print("Reset reason: " + ESP.getResetReason());
 
   strip.begin();
+  excess_strip.begin();
  }
 
  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
@@ -284,6 +287,7 @@ void setup() {
    server.onNotFound(handleNotFound);            // invalid url requested
    server.on("/green", handleLEDGreen); //Set all pixels to green
    server.on("/white", handleLEDWhite); //Set all pixels to white
+   server.on("/black", handleLEDBlack); //Set all pixels to white
    server.on("/colorAll", handleColorChange); //Set all pixels to a given color
    server.on("/colorRange", handleRangeColorChange); //Set all pixels to a given color
 #if ENABLE_OTA   
@@ -1908,7 +1912,7 @@ bool handleLEDGreen() {
 }  // handleLEDGreen
 
 // ----------------------------------------------------------------
-//     -set LEDs to a green    i.e. http://x.x.x.x/green
+//     -set LEDs to a white    i.e. http://x.x.x.x/white
 // ----------------------------------------------------------------
 
 bool handleLEDWhite() {
@@ -1926,6 +1930,38 @@ bool handleLEDWhite() {
   client.printf(R"=====(
     <h1>
       White LEDs Written
+    </h1>
+    )=====");
+  
+  sendFooter(client);
+  return 1;
+
+}  // handleLEDWhite
+
+// ----------------------------------------------------------------
+//     -set LEDs to a black    i.e. http://x.x.x.x/black
+// ----------------------------------------------------------------
+
+bool handleLEDBlack() {
+
+  int r = 0;
+  int g = 0;
+  int b = 0;
+  int brightness = 0; // 2 to 255 - 1 is not visible
+  // Add 300 extra to ensure everything is really off
+  //Ensure full blackness, for 300 pixels long, longer than the strip
+  for(uint16_t i = 0; i < 300; i++) {
+    excess_strip.setPixelColor(i, excess_strip.Color(0, 0, 0)); // Draw new pixel
+  }
+  excess_strip.show();
+  
+  WiFiClient client = server.client();          // open link with client
+
+  sendBasicHeader(client, "Black LED");
+
+  client.printf(R"=====(
+    <h1>
+      Black LEDs Written
     </h1>
     )=====");
   
