@@ -14,9 +14,10 @@ def transition_color_get_list(start_color, end_color, list_size):
         intermediate_color = interpolate_colors(start_color, end_color, step / list_size )
         transition_colors.append(intermediate_color)
 
-    # Print the transition colors
-    for color in transition_colors:
-        print(color)
+    # # Print the transition colors
+    # for color in transition_colors:
+    #     print(color)
+    return transition_colors
 
 def interpolate_colors(start_color, end_color, ratio):
     r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)

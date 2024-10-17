@@ -1,4 +1,3 @@
-
 #if !defined ESP32
  #error This sketch is only for an ESP32 Camera module
 #endif
@@ -290,6 +289,7 @@ void setup() {
    server.on("/black", handleLEDBlack); //Set all pixels to white
    server.on("/colorAll", handleColorChange); //Set all pixels to a given color
    server.on("/colorRange", handleRangeColorChange); //Set all pixels to a given color
+   server.on("/notifyFaceDetected", handleNotifyFaceDetected); //Set screen to white as an override
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
 #endif  
@@ -1880,7 +1880,7 @@ void writePixelNoShow(int n, int r, int g, int b, int brightness) {
   g = (g * brightness) >> 8;
   b = (b * brightness) >> 8;
 
-  strip.setPixelColor(n, strip.Color(r, g, b)); // Draw new pixel
+  strip.setPixelColor(n, r, g, b); // Draw new pixel
 }
 
 
@@ -2017,11 +2017,14 @@ bool handleRangeColorChange() {
     int r, g, b, brightness;
 
     for (int i = 0; i < N_LEDS; i++) {
+
+        writePixelNoShow(i, 0, 0, 0, 0);
         arg_prefix = "i" + String(i);
         
         r_str = server.arg(arg_prefix + "r");
         g_str = server.arg(arg_prefix + "g");
         b_str = server.arg(arg_prefix + "b");
+
         brightness_str = server.arg(arg_prefix + "brightness");
         
         if (!r_str.isEmpty() && !g_str.isEmpty() && !b_str.isEmpty() && !brightness_str.isEmpty()) {
@@ -2029,16 +2032,53 @@ bool handleRangeColorChange() {
             g = g_str.toInt();
             b = b_str.toInt();
             brightness = brightness_str.toInt();
+            //writeColor(r, g, b, brightness, i, i+1);
             writePixelNoShow(i, r, g, b, brightness);
             declaredPixels++;
         }
     }
-    
+    // Need to avoid flickers. Delay should be proportional to number of pixels.
+    delay(30);
+
     strip.show();
+
+    
+  
 
     sendBasicHeader(client, "Range Color Change");
     client.printf(R"=====(<h1>Range Color Set</h1><p>Updated LED colors successfully.</p><p>Number of LEDs Updated: %d</p>)=====", declaredPixels);
     sendFooter(client);
+
+    return 1;
+}
+
+
+// ----------------------------------------------------------------
+//     -set LEDs to a white, in a given range of LED indicies    i.e. http://x.x.x.x/notifyFaceDetected
+// ----------------------------------------------------------------
+
+bool handleNotifyFaceDetected() {
+
+
+ // Parse the input values from the client
+    WiFiClient client = server.client();
+    if (!client) return 0;
+
+    for (int i = 0; i < N_LEDS; i++) {
+
+        writePixelNoShow(i, 255, 255, 255, 127);
+    }
+    // Need to avoid flickers. Delay should be proportional to number of pixels.
+    delay(30);
+
+    strip.show();
+
+    sendBasicHeader(client, "Face detected");
+    client.printf(R"=====(<h1>Face Detected<h1>)=====");
+    sendFooter(client);
+
+    delay(5000);
+
 
     return 1;
 }
