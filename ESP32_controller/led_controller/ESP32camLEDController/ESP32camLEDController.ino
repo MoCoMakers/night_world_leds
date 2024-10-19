@@ -444,6 +444,21 @@ void setup() {
 
 void loop() {
 
+  if (!HAS_CAMERA){
+
+    int r = 0;
+    int g = 0;
+    int b = 0;
+    int brightness = 0; // 2 to 255 - 1 is not visible
+    // Add 300 extra to ensure everything is really off
+    //Ensure full blackness, for 300 pixels long, longer than the strip
+    for(uint16_t i = 0; i < 300; i++) {
+      excess_strip.setPixelColor(i, excess_strip.Color(0, 0, 0)); // Draw new pixel
+    }
+    excess_strip.show();
+    startAnimationTask();
+  }
+
  server.handleClient();          // handle any incoming web page requests
 
 //  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
@@ -2307,7 +2322,8 @@ void handleHeartbeatCalled(int r, int g, int b) {
   long startTime = millis();
   while (millis() - startTime < 15000) {  // Run for 15 seconds
     for (int i = 0; i < N_LEDS; i++) {
-      int brightness = 255 * (0.5 * sin(2 * 3.14 * (millis() % 1500) / 1500) + 0.5);  // Sinusoidal pulse
+      long currentMillis = millis();
+      int brightness = 255 * (0.5 * sin(2 * 3.1415 * (currentMillis % 1500) / 1500.0) + 0.5);  // Sinusoidal pulse
       int adjR = (r * brightness) / 255;
       int adjG = (g * brightness) / 255;
       int adjB = (b * brightness) / 255;
