@@ -9,7 +9,7 @@
 // Use this verions - https://github.com/teknynja/Adafruit_NeoPixel/tree/esp32_rmt_memory_allocation_fix_safe
 // See: https://forum.arduino.cc/t/neopixel-crash-with-75-pixels-using-esp32-core-3-0-x/1273500/12
 #include <Adafruit_NeoPixel.h>
-
+#include <math.h>
 //   ---------------------------------------------------------------------------------------------------------
 
 
@@ -20,12 +20,13 @@
 // ESP32 WiFi Configuration
 #define SSID_NAME "Sandwiches"
 #define SSID_PASWORD "123456789m"
-#define LAST_IP_OCTET 120 // Values are planned between 120 and 140 with no overlap
+#define LAST_IP_OCTET 121 // Values are planned between 120 and 140 with no overlap
+#define HAS_CAMERA false
 
 // e.g. 192.168.147.120 is the start of the range
 #define IP_PREFIX_1 192
 #define IP_PREFIX_2 168
-#define IP_PREFIX_3 147
+#define IP_PREFIX_3 96
 
 //LED Strip Configuration
 #define PIN 12
@@ -290,6 +291,14 @@ void setup() {
    server.on("/colorAll", handleColorChange); //Set all pixels to a given color
    server.on("/colorRange", handleRangeColorChange); //Set all pixels to a given color
    server.on("/notifyFaceDetected", handleNotifyFaceDetected); //Set screen to white as an override
+   server.on("/ping", handlePing); //Return pong for every ping
+   server.on("/fire",handleFire); //Fire animation (test)
+   server.on("/rainbow",handleRainbow);
+   server.on("/wave", handleWave);
+   server.on("/heartbeat", handleHeartbeat);
+   server.on("/fractal", handleFractal);
+   server.on("/animate", startAnimationTask);
+
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
 #endif  
@@ -309,7 +318,7 @@ void setup() {
 
  // set up camera
      if (serialDebug) Serial.print(("\nInitialising camera: "));
-     if (initialiseCamera(1)) {           // apply settings from 'config' and start camera
+     if (HAS_CAMERA && initialiseCamera(1)) {           // apply settings from 'config' and start camera
        if (serialDebug) Serial.println("OK");
      }
      else {
@@ -451,6 +460,7 @@ void loop() {
      esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
      digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
    }
+   
 }  // loop
 
 
@@ -2082,6 +2092,294 @@ bool handleNotifyFaceDetected() {
 
     return 1;
 }
+
+bool handlePing() {
+    if (serialDebug) Serial.println("In handle ping.");
+
+ // Parse the input values from the client
+    WiFiClient client = server.client();
+    if (!client) return 0;
+
+    sendBasicHeader(client, "Face detected");
+    client.printf(R"=====(<h1>Pong<h1>)=====");
+    sendFooter(client);
+
+    if (serialDebug) Serial.println("Leaving handle ping.");
+
+    return 1;
+}
+
+void hsvToRgb(int h, int s, int v, int* r, int* g, int* b) {
+  float hh = h / 256.0;
+  int i = int(hh * 6);
+  float ff = hh * 6 - i;
+  float p = v * (1 - s / 255.0);
+  float q = v * (1 - ff * s / 255.0);
+  float t = v * (1 - (1 - ff) * s / 255.0);
+  
+  switch(i % 6) {
+    case 0: *r = v, *g = t, *b = p; break;
+    case 1: *r = q, *g = v, *b = p; break;
+    case 2: *r = p, *g = v, *b = t; break;
+    case 3: *r = p, *g = q, *b = v; break;
+    case 4: *r = t, *g = p, *b = v; break;
+    case 5: *r = v, *g = p, *b = q; break;
+  }
+
+}
+
+bool handleRainbow() {
+  for(int j = 0; j < 256; j++) {
+    for(int i = 0; i < N_LEDS; i++) {
+      int pixelHue = (i * 256 / N_LEDS) + j;
+      int pixelIndex = (pixelHue >> 8) & 0xFF;
+      int r, g, b;
+      hsvToRgb(pixelIndex, 255, 255, &r, &g, &b);
+      writePixelNoShow(i, r, g, b, 255);
+    }
+    strip.show();
+    delay(20);
+  }
+}
+
+void handleRainbowCalled(int baseR, int baseG, int baseB) {
+  for (int j = 0; j < 256; j++) {
+    for (int i = 0; i < N_LEDS; i++) {
+      int pixelHue = (i * 256 / N_LEDS) + j;
+      int pixelIndex = (pixelHue >> 8) & 0xFF;
+      int r, g, b;
+      hsvToRgb(pixelIndex, 255, 255, &r, &g, &b);
+
+      int adjR = (r * baseR) / 255;
+      int adjG = (g * baseG) / 255;
+      int adjB = (b * baseB) / 255;
+
+      writePixelNoShow(i, adjR, adjG, adjB, 255);
+    }
+    strip.show();
+    delay(20);  // Reduced delay for faster updates
+  }
+}
+
+void handleWaveCalled(int r, int g, int b) {
+  float frequency = 1.0;  // Increase frequency for faster wave
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int j = 0; j < 256; j++) {
+      for (int i = 0; i < N_LEDS; i++) {
+        int brightness = int((sin(i * frequency + j) + 1) * 127.5);
+        int adjR = (r * brightness) / 255;
+        int adjG = (g * brightness) / 255;
+        int adjB = (b * brightness) / 255;
+        writePixelNoShow(i, adjR, adjG, adjB, 255);  // Use writePixelNoShow for color manipulation
+      }
+      strip.show();
+      delay(20);  // Reduce delay for faster updates
+    }
+  }
+}
+
+
+
+
+void handleWave() {
+  float frequency = 1.0;  // Increase frequency for faster wave
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int j = 0; j < 256; j++) {
+      for (int i = 0; i < N_LEDS; i++) {
+        int brightness = int((sin(i * frequency + j) + 1) * 127.5);
+        writePixelNoShow(i, 0, 0, brightness, 255);
+      }
+      strip.show();
+      delay(20);  // Reduce delay for faster updates
+    }
+  }
+}
+
+
+void handleFire() {
+  int heat[N_LEDS];
+  int cooling = 55;
+  int sparking = 120;
+  long startTime = millis();
+
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    // Step 1: Cool down every cell
+    for (int i = 0; i < N_LEDS; i++) {
+      heat[i] = (heat[i] - random(0, ((cooling * 10) / N_LEDS) + 2));
+      if (heat[i] < 0) heat[i] = 0;  // Ensure heat doesn't go below 0
+    }
+
+    // Step 2: Heat from each cell drifts up and diffuses
+    for (int i = N_LEDS - 1; i >= 2; i--) {
+      heat[i] = (heat[i - 1] + heat[i - 2] + heat[i - 2]) / 3;
+    }
+
+    // Step 3: Randomly ignite new sparks near the bottom
+    if (random(255) < sparking) {
+      int y = random(7);
+      heat[y] = heat[y] + random(160, 255);
+    }
+
+    // Step 4: Convert heat to LED colors with random flame colors
+    for (int i = 0; i < N_LEDS; i++) {
+      setPixelRandomColor(i, heat[i]);
+    }
+
+    strip.show();
+    delay(50);
+  }
+}
+
+void handleFireCalled(int r, int g, int b) {
+  int heat[N_LEDS];
+  int cooling = 55;
+  int sparking = 120;
+  long startTime = millis();
+
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    // Step 1: Cool down every cell
+    for (int i = 0; i < N_LEDS; i++) {
+      heat[i] = (heat[i] - random(0, ((cooling * 10) / N_LEDS) + 2));
+      if (heat[i] < 0) heat[i] = 0;  // Ensure heat doesn't go below 0
+    }
+
+    // Step 2: Heat from each cell drifts up and diffuses
+    for (int i = N_LEDS - 1; i >= 2; i--) {
+      heat[i] = (heat[i - 1] + heat[i - 2] + heat[i - 2]) / 3;
+    }
+
+    // Step 3: Randomly ignite new sparks near the bottom
+    if (random(255) < sparking) {
+      int y = random(7);
+      heat[y] = heat[y] + random(160, 255);
+    }
+
+    // Step 4: Convert heat to LED colors with input flame colors
+    for (int i = 0; i < N_LEDS; i++) {
+      setPixelHeatColor(i, heat[i], r, g, b);
+    }
+
+    strip.show();
+    delay(50);
+  }
+}
+
+void setPixelHeatColor(int pixel, int temperature, int r, int g, int b) {
+  int t192 = round((temperature / 255.0) * 191);
+
+  byte heatramp = t192 & 0x3F;  // 0..63
+  heatramp <<= 2;  // Scale up to 0..252
+
+  if (t192 > 128) {
+    writePixelNoShow(pixel, r, g, heatramp, 255);
+  } else if (t192 > 64) {
+    writePixelNoShow(pixel, r, heatramp, b, 255);
+  } else {
+    writePixelNoShow(pixel, heatramp, g, b, 255);
+  }
+}
+
+
+void setPixelRandomColor(int pixel, int temperature) {
+  int r = random(100, 256);
+  int g = random(0, 100);
+  int b = random(0, 100);
+  int brightness = (temperature > 255) ? 255 : temperature;
+
+  writePixelNoShow(pixel, r, g, b, brightness);
+}
+
+void handleHeartbeat() {
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int i = 0; i < N_LEDS; i++) {
+      int brightness = 255 * (0.5 * sin(2 * 3.14 * (millis() % 1500) / 1500) + 0.5);  // Sinusoidal pulse
+      writePixelNoShow(i, brightness, 0, 0, 255);  // Red color for heartbeat
+    }
+    strip.show();
+    delay(30);
+  }
+}
+
+void handleHeartbeatCalled(int r, int g, int b) {
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int i = 0; i < N_LEDS; i++) {
+      int brightness = 255 * (0.5 * sin(2 * 3.14 * (millis() % 1500) / 1500) + 0.5);  // Sinusoidal pulse
+      int adjR = (r * brightness) / 255;
+      int adjG = (g * brightness) / 255;
+      int adjB = (b * brightness) / 255;
+      writePixelNoShow(i, adjR, adjG, adjB, 255);  // Use writePixelNoShow for color manipulation
+    }
+    strip.show();
+    delay(30);  // Update delay as needed
+  }
+}
+
+
+void handleFractal() {
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int offset = 0; offset < N_LEDS; offset++) {
+      for (int i = 0; i < N_LEDS; i++) {
+        int fractalValue = (int)(128.0 + 128.0 * sin(i * 3.1415 / 16.0 + millis() / 1000.0 + offset / 10.0));
+        writePixelNoShow(i, 0, 0, fractalValue, 255); // Use writePixelNoShow for color manipulation
+      }
+      strip.show();
+      delay(20);  // Reduced delay for faster updates
+    }
+  }
+}
+
+void handleFractalCalled(int r, int g, int b) {
+  long startTime = millis();
+  while (millis() - startTime < 15000) {  // Run for 15 seconds
+    for (int offset = 0; offset < N_LEDS; offset++) {
+      for (int i = 0; i < N_LEDS; i++) {
+        int fractalValue = (int)(128.0 + 128.0 * sin(i * 3.1415 / 16.0 + millis() / 1000.0 + offset / 10.0));
+        int adjR = (r * fractalValue) / 255;
+        int adjG = (g * fractalValue) / 255;
+        int adjB = (b * fractalValue) / 255;
+        writePixelNoShow(i, adjR, adjG, adjB, 255); // Use writePixelNoShow for color manipulation
+      }
+      strip.show();
+      delay(20);  // Reduced delay for faster updates
+    }
+  }
+}
+
+
+
+void startAnimationTask() {
+    int currentColor[3] = {255, 255, 255};
+    while (true) {
+      int animationType = random(0, 5);  // Randomly pick an animation
+      // Set a random color
+      currentColor[0] = random(0, 256);
+      currentColor[1] = random(0, 256);
+      currentColor[2] = random(0, 256);
+      switch (animationType) {
+          case 0:
+              handleFireCalled(currentColor[0], currentColor[1], currentColor[2]);
+              break;
+          case 1:
+              handleRainbowCalled(currentColor[0], currentColor[1], currentColor[2]);
+              break;
+          case 2:
+              handleWaveCalled(currentColor[0], currentColor[1], currentColor[2]);
+              break;
+          case 3:
+              handleHeartbeatCalled(currentColor[0], currentColor[1], currentColor[2]);
+              break;
+          case 4:
+              handleFractalCalled(currentColor[0], currentColor[1], currentColor[2]);
+              break;
+      }
+    }
+}
+    
 
 
 
